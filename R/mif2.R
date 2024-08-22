@@ -19,6 +19,8 @@
 ##' @inheritParams pfilter
 ##' @inheritParams pomp
 ##' @param Nmif The number of filtering iterations to perform.
+##' @param full_traces Should the function return traces including 
+##' within-iteration parameter estimates?
 ##' @param rw.sd specification of the magnitude of the random-walk perturbations that will be applied to some or all model parameters.
 ##' Parameters that are to be estimated should have positive perturbations specified here.
 ##' The specification is given using the \code{\link{rw_sd}} function, which creates a list of unevaluated expressions.
@@ -94,7 +96,8 @@ setClass(
     rw.sd = 'matrix',
     cooling.type = 'character',
     cooling.fraction.50 = 'numeric',
-    traces = 'matrix'
+    traces = 'matrix',
+    full_traces = 'matrix'
   )
 )
 
@@ -130,6 +133,7 @@ setMethod(
     cooling.type = c("geometric", "hyperbolic"), cooling.fraction.50,
     Np,
     params, rinit, rprocess, dmeasure, partrans,
+    full_traces = FALSE,
     ..., verbose = getOption("verbose", FALSE)) {
 
     tryCatch(
@@ -145,6 +149,7 @@ setMethod(
         rprocess=rprocess,
         dmeasure=dmeasure,
         partrans=partrans,
+        full_traces=full_traces,
         ...,
         verbose=verbose
       ),
@@ -162,7 +167,7 @@ setMethod(
   definition = function (data,
     Nmif = 1, rw.sd,
     cooling.type = c("geometric", "hyperbolic"), cooling.fraction.50,
-    Np, ..., verbose = getOption("verbose", FALSE)) {
+    Np, full_traces = FALSE, ..., verbose = getOption("verbose", FALSE)) {
 
     tryCatch(
       mif2_internal(
@@ -172,6 +177,7 @@ setMethod(
         cooling.type=match.arg(cooling.type),
         cooling.fraction.50=cooling.fraction.50,
         Np=Np,
+        full_traces=full_traces,
         ...,
         verbose=verbose
       ),
@@ -187,7 +193,7 @@ setMethod(
   "mif2",
   signature=signature(data="pfilterd_pomp"),
   definition = function (data,
-    Nmif = 1, Np,
+    Nmif = 1, Np, full_traces = FALSE,
     ..., verbose = getOption("verbose", FALSE)) {
 
     if (missing(Np)) Np <- data@Np
@@ -196,6 +202,7 @@ setMethod(
       as(data,"pomp"),
       Nmif=Nmif,
       Np=Np,
+      full_traces=full_traces,
       ...,
       verbose=verbose
     )
@@ -210,6 +217,7 @@ setMethod(
   definition = function (data,
     Nmif, rw.sd,
     cooling.type, cooling.fraction.50,
+    full_traces = FALSE,
     ..., verbose = getOption("verbose", FALSE)) {
 
     if (missing(Nmif)) Nmif <- data@Nmif
@@ -223,6 +231,7 @@ setMethod(
       rw.sd=rw.sd,
       cooling.type=cooling.type,
       cooling.fraction.50=cooling.fraction.50,
+      full_traces=full_traces,
       ...,
       verbose=verbose
     )
@@ -236,13 +245,14 @@ setMethod(
 setMethod(
   "continue",
   signature=signature(object="mif2d_pomp"),
-  definition = function (object, Nmif = 1, ...) {
+  definition = function (object, Nmif = 1, full_traces = FALSE, ...) {
 
     ndone <- object@Nmif
 
     obj <- mif2(
       object,
       Nmif=Nmif,
+      full_traces=full_traces,
       ...,
       .ndone=ndone,
       .paramMatrix=object@paramMatrix
@@ -261,7 +271,7 @@ setMethod(
 )
 
 mif2_internal <- function (object, Nmif, rw.sd,
-  cooling.type, cooling.fraction.50, Np, ..., verbose,
+  cooling.type, cooling.fraction.50, Np, full_traces, ..., verbose,
   .ndone = 0L, .indices = integer(0), .paramMatrix = NULL,
   .gnsi = TRUE) {
 
@@ -324,6 +334,16 @@ mif2_internal <- function (object, Nmif, rw.sd,
     )
   )
   traces[1L,] <- c(NA,start)
+  
+  ftraces <- array(
+    data=NA_real_,
+    dim=c(ntimes*Nmif+1,length(start)+1),
+    dimnames=list(
+      step=NULL,
+      name=c("cond_logLik",names(start))
+    )
+  )
+  ftraces[1L,] <- c(NA,start)
 
   pompLoad(object,verbose=verbose)
   on.exit(pompUnload(object,verbose=verbose))
@@ -340,6 +360,7 @@ mif2_internal <- function (object, Nmif, rw.sd,
       mifiter=.ndone+n,
       cooling.fn=cooling.fn,
       rw.sd=rw.sd,
+      full_traces=full_traces,
       verbose=verbose,
       .indices=.indices,
       .gnsi=gnsi
@@ -351,6 +372,8 @@ mif2_internal <- function (object, Nmif, rw.sd,
     traces[n+1,-1L] <- coef(pfp)
     traces[n,1L] <- pfp@loglik
     .indices <- pfp@indices
+    if (full_traces) 
+      ftraces[(2+ntimes*(n-1)):(1+ntimes*n),] <- pfp@filter.mean
 
     if (verbose) cat("mif2 iteration",n,"of",Nmif,"completed\n")
 
@@ -365,7 +388,8 @@ mif2_internal <- function (object, Nmif, rw.sd,
     rw.sd=rw.sd,
     cooling.type=cooling.type,
     cooling.fraction.50=cooling.fraction.50,
-    traces=traces
+    traces=traces,
+    full_traces=ftraces
   )
 
 }
@@ -397,9 +421,10 @@ mif2_cooling <- function (type, fraction, ntimes) {
 }
 
 mif2_pfilter <- function (object, params, Np, mifiter, rw.sd, cooling.fn,
-  verbose, .indices = integer(0), .gnsi = TRUE) {
-
+  verbose, full_traces, .indices = integer(0), .gnsi = TRUE) {
+  
   gnsi <- as.logical(.gnsi)
+  full_traces <- as.logical(full_traces)
   verbose <- as.logical(verbose)
   mifiter <- as.integer(mifiter)
   Np <- as.integer(Np)
@@ -413,6 +438,18 @@ mif2_pfilter <- function (object, params, Np, mifiter, rw.sd, cooling.fn,
 
   loglik <- rep(NA,ntimes)
   eff.sample.size <- numeric(ntimes)
+  
+  if (full_traces) {
+    ftraces <- array(
+      data=NA_real_,
+      dim=c(ntimes,nrow(params)+1),
+      dimnames=list(
+        step=NULL,
+        name=c("cond_logLik",rownames(params))
+      )
+    )
+    #ftraces[1L,] <- c(NA,start)
+  }
 
   for (nt in seq_len(ntimes)) {
 
@@ -453,7 +490,7 @@ mif2_pfilter <- function (object, params, Np, mifiter, rw.sd, cooling.fn,
     ## also do resampling if filtering has not failed
     xx <- .Call(P_pfilter_computations,x=X,params=params,Np=Np[nt+1],
       predmean=FALSE,predvar=FALSE,filtmean=FALSE,trackancestry=do_ta,
-      doparRS=TRUE,weights=weights,wave=(nt==ntimes))
+      doparRS=TRUE,weights=weights,wave=(nt==ntimes)|full_traces)
 
     ## the following is triggered by the first illegal weight value
     if (is.integer(xx)) {
@@ -470,7 +507,12 @@ mif2_pfilter <- function (object, params, Np, mifiter, rw.sd, cooling.fn,
     loglik[nt] <- xx$loglik
     eff.sample.size[nt] <- xx$ess
     if (do_ta) .indices <- .indices[xx$ancestry]
-
+    if (full_traces) {
+      ftraces[nt,1] <- xx$loglik
+      coef(object,transform=TRUE) <- xx$wmean
+      ftraces[nt,-1] <- coef(object)
+    }
+    
     x <- xx$states
     params <- xx$params
 
@@ -487,7 +529,8 @@ mif2_pfilter <- function (object, params, Np, mifiter, rw.sd, cooling.fn,
     cond.logLik=loglik,
     indices=.indices,
     Np=Np,
-    loglik=sum(loglik)
+    loglik=sum(loglik),
+    filter.mean=if (full_traces) ftraces else array(data=numeric(0),dim=c(0,0))
   )
 }
 

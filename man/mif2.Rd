@@ -22,6 +22,7 @@
   rprocess,
   dmeasure,
   partrans,
+  full_traces = FALSE,
   ...,
   verbose = getOption("verbose", FALSE)
 )
@@ -33,11 +34,19 @@
   cooling.type = c("geometric", "hyperbolic"),
   cooling.fraction.50,
   Np,
+  full_traces = FALSE,
   ...,
   verbose = getOption("verbose", FALSE)
 )
 
-\S4method{mif2}{pfilterd_pomp}(data, Nmif = 1, Np, ..., verbose = getOption("verbose", FALSE))
+\S4method{mif2}{pfilterd_pomp}(
+  data,
+  Nmif = 1,
+  Np,
+  full_traces = FALSE,
+  ...,
+  verbose = getOption("verbose", FALSE)
+)
 
 \S4method{mif2}{mif2d_pomp}(
   data,
@@ -45,6 +54,7 @@
   rw.sd,
   cooling.type,
   cooling.fraction.50,
+  full_traces = FALSE,
   ...,
   verbose = getOption("verbose", FALSE)
 )
@@ -105,6 +115,9 @@ When working with such an algorithm and a model for which the parameters are con
 One should supply the \code{partrans} argument via a call to \code{\link{parameter_trans}}.
 For more information, see \link[=parameter_trans]{parameter_trans}.
 Setting \code{partrans=NULL} removes the parameter transformations, i.e., sets them to the identity transformation.}
+
+\item{full_traces}{Should the function return traces including 
+within-iteration parameter estimates?}
 
 \item{...}{additional arguments are passed to \code{\link{pomp}}.}
 

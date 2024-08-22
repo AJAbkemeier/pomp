@@ -3,7 +3,7 @@ png(filename="mif2-%02d.png",res=100)
 
 set.seed(857075216L)
 
-library(pomp)
+#library(pomp)
 library(dplyr)
 
 gompertz() |> window(end=10) -> po
@@ -92,6 +92,7 @@ mif2(po,Nmif=2,Np=50,rw.sd=rw_sd(sigma=0.01),
 try(mif2(po,Nmif=2,Np=50,rw.sd=rw_sd(sigma=0.01),cooling.fraction.50=0.1,dmeasure=NULL))
 try(mif2(po,Nmif=2,Np=50,rw.sd=rw_sd(sigma=0.01),cooling.fraction.50=0.1,rprocess=NULL))
 try(mif2(po,Nmif=2,Np=50,rw.sd=rw_sd(sigma=0.01),cooling.fraction.50=0.1,params=NULL))
+try(mif2(po,Nmif=2,Np=50,rw.sd=rw_sd(sigma=0.02,K=0.02,r=0.02),cooling.fraction.50=0.1,full_traces=TRUE))
 
 theta <- coef(po)
 theta["sigma"] <- 0.2

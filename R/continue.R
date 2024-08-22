@@ -8,6 +8,8 @@
 ##' @seealso \code{\link{mif2}} \code{\link{pmcmc}} \code{\link{abc}}
 ##'
 ##' @param object the result of an iterative \pkg{pomp} computation
+##' @param full_traces Should the function return traces including 
+##' within-iteration parameter estimates?
 ##' @param \dots additional arguments will be passed to the underlying method.
 ##' This allows one to modify parameters used in the original computations.
 NULL

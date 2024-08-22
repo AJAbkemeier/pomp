@@ -13,7 +13,7 @@
 
 \S4method{continue}{pmcmcd_pomp}(object, Nmcmc = 1, ...)
 
-\S4method{continue}{mif2d_pomp}(object, Nmif = 1, ...)
+\S4method{continue}{mif2d_pomp}(object, Nmif = 1, full_traces = FALSE, ...)
 }
 \arguments{
 \item{object}{the result of an iterative \pkg{pomp} computation}
